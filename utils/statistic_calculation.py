@@ -117,7 +117,7 @@ def t_dist_likelihood(data, theta, dataset_parameters):
     return likelihood
 
 
-# def em_algorithm(data, dataset_parameters, em_steps=10):
+# def em_algorithm_old(data, dataset_parameters, em_steps=10):
 #     """Run EM algorithm for optimization likelihood of t-distribution. We suppose known sigma and degrees freedom, sigma=identity(d). 
 
 #     Args:
@@ -137,11 +137,10 @@ def t_dist_likelihood(data, theta, dataset_parameters):
 #     theta_prev = np.random.rand(dataset_size, d)
 
 #     for i in range(0, em_steps):
-#         #w = (nu + d) / (nu + (np.linalg.norm(data - np.expand_dims(theta_prev, 1), axis=2) ** 2))
-#         w = (nu + d) / (nu + ((data - np.expand_dims(theta_prev, 1)) ** 2).sum(2))
-#         theta_next = (data * np.expand_dims(w, -1)).sum(1)
-#         theta_prev = theta_next
-    
+#         w = (nu + d) / (nu + (np.linalg.norm(data - np.expand_dims(theta_prev, 1), axis=2) ** 2))
+#         #w = (nu + d) / (nu + ((data - np.expand_dims(theta_prev, 1)) ** 2).sum(2))
+#         theta_next = (data * np.expand_dims(w, -1)).sum(1) / np.expand_dims(w, -1).sum(1)
+#         theta_prev = theta_next    
 #     return theta_prev
 
 
@@ -163,18 +162,20 @@ def em_algorithm_numba(data, nu, d, theta_prev, em_steps=10):
     dataset_size = theta_prev.shape[0]
     seq_len = data.shape[1]
 
-    for _ in range(em_steps):
+    for _ in range(0, em_steps):
         theta_next = np.zeros((dataset_size, d))
-        for j in range(dataset_size):
-            for k in range(seq_len):
+        for j in range(0, dataset_size):
+            w_sum = 1e-18
+            for k in range(0, seq_len):
                 diff_sq = 0
-                for l in range(d):
+                for l in range(0, d):
                     diff_sq += (data[j, k, l] - theta_prev[j, l])**2
                 w = (nu + d) / (nu + diff_sq)
-                for l in range(d):
+                w_sum += w
+                for l in range(0, d):
                     theta_next[j, l] += data[j, k, l] * w
+            theta_next[j] = theta_next[j] / w_sum
         theta_prev = theta_next
-
     return theta_prev
 
 def em_algorithm(data, dataset_parameters, em_steps=10, **kwargs):

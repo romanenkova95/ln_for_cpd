@@ -119,5 +119,8 @@ def c_alpha(alpha, n, p):
         return 2 * log(x) + (p / 2) * log(log(x)) - log(gamma(p / 2))
     log_n = log(n)
     d_p_log_n = d_p(log_n, p)
-    c_alpha = 1 / (2 * log(log_n)) * ((d_p_log_n - log(log((1 - alpha + exp(-2 * exp(d_p_log_n))) ** -0.5))) ** 2) - p * log_n
+    coef = 1 / (2 * log(log_n)) 
+    exp_part = exp(-2 * exp(d_p_log_n))
+    log_part = (1 - alpha + exp_part) ** (-0.5) # negative for large p
+    c_alpha = coef * (d_p_log_n - log(log(log_part))) ** 2 - p * log_n
     return c_alpha

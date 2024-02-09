@@ -91,7 +91,7 @@ def generate_data(
     # add change points
     cp_idxs = []
     if cp is None:
-        cp_idxs = np.random.randint(1, seq_len - 1, dataset_size)
+        cp_idxs = np.random.randint(5, seq_len - 1, dataset_size)
     else:
         cp_idxs = [cp] * dataset_size
 

@@ -71,39 +71,44 @@ def detect_cps_normal(data: np.array, dataset_parameters: dict, alpha: float = 0
         detected_cp_idxs.append(cp)
     return np.array(detected_cp_idxs), l_statistic
 
-def detect_cps_t_dist(data, dataset_parameters, alpha=0.95):
+def detect_cps_t_dist(data, dataset_parameters, alpha=0.95, w=5):
     """Detect CPs based on SIC criteria in T-distribution assumption.
 
     Args:
         data: np.array with considered sequences
         dataset_parameters: dict with dataset paramters
+        alpha: confidence level for threshold calculation
+        w: paramter to avoid edge effects (near zero value of likelihood calculated on 1-2 points), default=3
     Returns:
         np.array with corresponded statistic for CPD.
 
     """
-    threshold = th.c_alpha(alpha, dataset_parameters["seq_len"], dataset_parameters["p"])
+    #threshold = th.c_alpha(1 - alpha, dataset_parameters["seq_len"], dataset_parameters["p"])
+    threshold = dataset_parameters["d"] * 1.5
     theta = stat.em_algorithm(data, dataset_parameters)
+    n = dataset_parameters["seq_len"]
     likelihood_no_cp = stat.t_dist_likelihood(data, theta, dataset_parameters)
-
     delta_sic = []
     likelihood_cp = []
-    n = dataset_parameters["seq_len"]
+
     for k in range(0, n):
-        theta_0 = stat.em_algorithm(data[:, :k, :], dataset_parameters)
-        #theta_0 = theta
-        theta_1 = stat.em_algorithm(data[:, k:, :], dataset_parameters)
-        likelihood_cp_k = stat.t_dist_likelihood(data[:, :(k + 1), :], theta_0, dataset_parameters) + stat.t_dist_likelihood(data[:, (k + 1):, :], theta_1, dataset_parameters)
-        delta_sic_k = likelihood_cp_k - likelihood_no_cp + dataset_parameters["p"] * np.log(n)
+        if (k < w) or (n - k <= w):
+            delta_sic_k = 999999 * np.ones((dataset_parameters["dataset_size"], ))
+            likelihood_cp_k = 999999 * np.ones((dataset_parameters["dataset_size"], ))
+        else:
+            theta_0 = stat.em_algorithm(data[:, :(k + 1), :], dataset_parameters)
+            theta_1 = stat.em_algorithm(data[:, (k + 1):, :], dataset_parameters)
+            likelihood_cp_k = stat.t_dist_likelihood(data[:, :(k + 1), :], theta_0, dataset_parameters) + stat.t_dist_likelihood(data[:, (k + 1):, :], theta_1, dataset_parameters)
+            delta_sic_k = likelihood_cp_k - likelihood_no_cp + dataset_parameters["p"] * np.log(n)
 
         delta_sic.append(delta_sic_k)
         likelihood_cp.append(likelihood_cp_k)
 
     delta_sic = np.array(delta_sic).transpose()
     likelihood_cp = np.array(likelihood_cp).transpose()
-    predicted_cp = np.where(min(delta_sic_k) + threshold > 0, -1, likelihood_cp.argmin(1))
+    predicted_cp = np.where(delta_sic.min(1) + threshold > 0, -1, likelihood_cp.argmin(1))
     
-    return predicted_cp, likelihood_cp
-
+    return predicted_cp, likelihood_cp    
 def detect_cps(data, dataset_parameters: dict, cp_parameters:dict, data_type="normal"):
     if data_type == "normal":
         detected_cp_idxs, _ = detect_cps_normal(data, dataset_parameters, cp_parameters["alpha"], cp_parameters["ln"], cp_parameters["scan"], data_based=cp_parameters["data_based"])
