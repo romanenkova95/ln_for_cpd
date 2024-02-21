@@ -23,7 +23,7 @@ def sample_data(dataset_size, seq_len, d, distribution="normal", nu=10, seed=123
         np.array of data with sise (dataset_size, seq_len, d)
     """
     np.random.seed(seed)
-    random.seed(123)
+    random.seed(seed)
 
     if distribution == "normal":
         data = np.random.multivariate_normal(
@@ -75,7 +75,7 @@ def generate_data(
             - array with generated data WITHOUT change points
             - list with change point indexes for first mentioned dataset
     """
-    data_cp = sample_data(dataset_size, seq_len, d, distribution, seed)
+    data_cp = sample_data(dataset_size, seq_len, d, distribution, nu, seed)
     data_without_cp = deepcopy(data_cp)
 
 
@@ -91,7 +91,7 @@ def generate_data(
     # add change points
     cp_idxs = []
     if cp is None:
-        cp_idxs = np.random.randint(5, seq_len - 1, dataset_size)
+        cp_idxs = np.random.randint(10, seq_len - 1, dataset_size)
     else:
         cp_idxs = [cp] * dataset_size
 

@@ -1,0 +1,9 @@
+dataset_size: 100
+seq_len: 101
+d: 100
+p: 25
+distribution: "t-distribution"
+k: 0.5
+cp: null
+nu: 3
+seed: 124
