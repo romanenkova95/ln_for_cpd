@@ -108,39 +108,33 @@ def t_dist_data_inference(data, dataset_parameters, w=5):
     likelihood_cp = np.array(likelihood_cp).transpose()
     return delta_sic, likelihood_cp
 
-def detect_cps_t_dist(data, dataset_parameters, alpha=0.95, w=5):
+def detect_cps_t_dist(data_with_cp, data_without_cp, dataset_parameters, alpha=0.95, w=5):
     """Detect CPs based on SIC criteria in T-distribution assumption.
 
     Args:
-        data: np.array with considered sequences
+        data_with_cp: np.array with sequences with CP
+        data_without_cp: np.array with sequences without CP
         dataset_parameters: dict with dataset paramters
         alpha: confidence level for threshold calculation
         w: paramter to avoid edge effects (near zero value of likelihood calculated on 1-2 points), default=3
     Returns:
-        np.array with corresponded statistic for CPD.
+        np.array with fn and fp errors
 
     """
-    delta_sic, likelihood_cp = t_dist_data_inference(data, dataset_parameters, w)
+    delta_sic_with, likelihood_cp_with = t_dist_data_inference(data_with_cp, dataset_parameters, w)
+    delta_sic_without, likelihood_cp_without = t_dist_data_inference(data_without_cp, dataset_parameters, w)
 
-    threshold = np.quantile(delta_sic[:, 5:-5].flatten(), 0.1)
-    d = dataset_parameters["d"]
+    delta_sic_with = - delta_sic_with #switch to avoid working with negative value
+    delta_sic_without = - delta_sic_without
 
+    threshold = np.quantile(delta_sic_without[:, 5:-5].flatten(), 1 - alpha)
 
-    print(delta_sic.max(1).mean())    
-    print(threshold)
-    print('----')
-    predicted_cp = np.where(delta_sic.min(1) > threshold , -1, likelihood_cp.argmin(1))
-    #predicted_cp = np.where(delta_sic.max(1) > threshold , likelihood_cp.argmin(1), -1)
-    return predicted_cp, delta_sic  
+    #predicted_cp = np.where(delta_sic.min(1) > threshold , -1, likelihood_cp.argmin(1))
+    detected_cp = np.where(delta_sic_with.max(1) > threshold , likelihood_cp_with.argmin(1), -1)
+    detected_false_cp = np.where(delta_sic_without.max(1) > threshold , likelihood_cp_without.argmin(1), -1)
+    fn, fp = calculate_error(detected_cp, detected_false_cp)
 
-def detect_cps(data, dataset_parameters: dict, cp_parameters:dict, data_type="normal"):
-    if data_type == "normal":
-        detected_cp_idxs, _ = detect_cps_normal(data, dataset_parameters, cp_parameters["alpha"], cp_parameters["ln"], cp_parameters["scan"], data_based=cp_parameters["data_based"])
-    elif data_type == "t-distribution":
-        detected_cp_idxs, _ = detect_cps_t_dist(data, dataset_parameters, cp_parameters["alpha"])
-    else:
-        raise ValueError(f"Not implemented for {data_type}")
-    return detected_cp_idxs, _
+    return fn, fp  
 
 def calculate_error(detected_cp: np.array, detected_false_cp: np.array):
     """Calculate FN (power) and FP metrics for predictions.
@@ -158,27 +152,10 @@ def calculate_error(detected_cp: np.array, detected_false_cp: np.array):
     false_positive = sum(detected_false_cp != -1) / len(detected_false_cp)
     return false_negative, false_positive
 
-def detect_true_false_cp(data_with_cp: np.array, data_without_cp: np.array, dataset_parameters: dict, cp_parameters: dict, data_type="normal"):
-    """Detect cpd indexes for data with and without change point and calculate errors.
-
-    Args:
-        data_with_cp: data with change point 
-        data_without_cp: the same data, but without change point
-        dataset_parameters: dict with dataset paramters
-    Returns:
-        FN, FP
-
-    """
-    detected_cp_idxs, _  = detect_cps(data_with_cp, dataset_parameters, cp_parameters, data_type)
-    detected_false_cp_idxs, _  = detect_cps(data_without_cp, dataset_parameters, cp_parameters, data_type)
-
-    fn, fp = calculate_error(detected_cp_idxs, detected_false_cp_idxs)
-    return fn, fp
-
 def cpd_with_ln_compare(
     dataset_parameters: dict, cp_parameters:dict, data_type="normal"
 ):
-    """Compare CP detection with using Layer Norm and without.
+    """Compare CP detection with using Layer Norm and without. In t-distribution assumption. 
 
     Args:
         dataset_parameters: dict with parameters for data generation (dataset size, dimensions, seq_len, etc.)
@@ -187,13 +164,7 @@ def cpd_with_ln_compare(
     """
     data_with_cp, data_without_cp, cp_idxs = generate_data(**dataset_parameters)
 
-    fn, fp = detect_true_false_cp(
-        data_with_cp,
-        data_without_cp,
-        dataset_parameters, 
-        cp_parameters,
-        data_type
-    )
+    fn, fp = detect_cps_t_dist(data_with_cp, data_without_cp, dataset_parameters, alpha=cp_parameters["alpha"], w=5)
 
     ### with Layer Norm
     cp_parameters["ln"] = True
@@ -205,12 +176,6 @@ def cpd_with_ln_compare(
         layer_norm(torch.from_numpy(data_without_cp).float()).detach().numpy()
     )
 
-    fn_ln, fp_ln = detect_true_false_cp(
-        data_with_cp_ln,
-        data_without_cp_ln,
-        dataset_parameters, 
-        cp_parameters,
-        data_type
-    )
 
+    fn_ln, fp_ln = detect_cps_t_dist(data_with_cp_ln, data_without_cp_ln, dataset_parameters, alpha=cp_parameters["alpha"], w=5)
     return (fn, fp), (fn_ln, fp_ln)

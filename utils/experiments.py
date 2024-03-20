@@ -20,9 +20,8 @@ def compare_with_ln(config: DictConfig):
     stat_beta = {}
     stat_beta_ln = {}
 
-    #for d in range(10, 1000, 100):
-    for d in [100, 250, 500, 1000]:
-        print(d)
+    for d in range(100, 1000, 100):
+    #for d in [100, 250, 500, 1000]:
         dataset_parameters["d"] = d
         (fn, fp), (fn_ln, fp_ln) = cpd.cpd_with_ln_compare(
             dataset_parameters, cp_parameters, data_type="t-distribution"
